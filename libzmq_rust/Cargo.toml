@@ -1,0 +1,53 @@
+[package]
+name = "libzmq_rust"
+version = "0.1.0"
+edition = "2021"
+license = "MPL-2.0"
+description = "Pure Rust reimplementation of libzmq (ZeroMQ)"
+
+[workspace]
+resolver = "2"
+members = [
+    "zmq-core",
+    "zmq-transport",
+    "zmq-runtime",
+    "zmq-context",
+    "zmq-ffi",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MPL-2.0"
+
+[workspace.dependencies]
+bytes = "1"
+thiserror = "2"
+bitflags = "2"
+log = "0.4"
+parking_lot = "0.12"
+tokio = { version = "1", features = ["full"] }
+rstest = "0.23"
+criterion = "0.5"
+
+[dependencies]
+zmq-core = { path = "zmq-core" }
+zmq-transport = { path = "zmq-transport" }
+zmq-runtime = { path = "zmq-runtime" }
+zmq-context = { path = "zmq-context" }
+
+[dev-dependencies]
+rstest = { workspace = true }
+
+# Perf benchmarks (run with: cargo run --example inproc_thr --release)
+[[example]]
+name = "inproc_thr"
+path = "perf/inproc_thr.rs"
+
+[[example]]
+name = "inproc_lat"
+path = "perf/inproc_lat.rs"
+
+[[example]]
+name = "benchmark_radix_tree"
+path = "perf/benchmark_radix_tree.rs"

@@ -1,0 +1,20 @@
+[package]
+name = "zmq-context"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Public API for ZeroMQ — ZContext, ZSocket, options, monitoring"
+
+[dependencies]
+zmq-core = { path = "../zmq-core" }
+zmq-transport = { path = "../zmq-transport" }
+zmq-runtime = { path = "../zmq-runtime" }
+tokio = { workspace = true }
+bytes = { workspace = true }
+thiserror = { workspace = true }
+bitflags = { workspace = true }
+log = { workspace = true }
+parking_lot = { workspace = true }
+
+[dev-dependencies]
+rstest = { workspace = true }

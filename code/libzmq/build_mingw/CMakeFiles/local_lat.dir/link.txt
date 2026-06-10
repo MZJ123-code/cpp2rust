@@ -1,0 +1,3 @@
+D:\CMake\bin\cmake.exe -E rm -f CMakeFiles\local_lat.dir/objects.a
+D:\mingw64\bin\ar.exe qc CMakeFiles\local_lat.dir/objects.a @CMakeFiles\local_lat.dir\objects1.rsp
+D:\mingw64\bin\g++.exe  -std=c++11 -Wno-tautological-constant-compare -O3 -DNDEBUG -Wl,--whole-archive CMakeFiles\local_lat.dir/objects.a -Wl,--no-whole-archive -o bin\local_lat.exe -Wl,--out-implib,lib\liblocal_lat.dll.a -Wl,--major-image-version,0,--minor-image-version,0 @CMakeFiles\local_lat.dir\linkLibs.rsp

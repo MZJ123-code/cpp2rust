@@ -1,0 +1,3 @@
+D:\CMake\bin\cmake.exe -E rm -f CMakeFiles\local_thr.dir/objects.a
+D:\mingw64\bin\ar.exe qc CMakeFiles\local_thr.dir/objects.a @CMakeFiles\local_thr.dir\objects1.rsp
+D:\mingw64\bin\g++.exe  -std=c++11 -Wno-tautological-constant-compare -O3 -DNDEBUG -Wl,--whole-archive CMakeFiles\local_thr.dir/objects.a -Wl,--no-whole-archive -o bin\local_thr.exe -Wl,--out-implib,lib\liblocal_thr.dll.a -Wl,--major-image-version,0,--minor-image-version,0 @CMakeFiles\local_thr.dir\linkLibs.rsp

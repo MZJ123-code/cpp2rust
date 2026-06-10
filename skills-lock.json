@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "rust-refactor-helper": {
+      "source": "actionbook/rust-skills",
+      "sourceType": "github",
+      "skillPath": "skills/rust-refactor-helper/SKILL.md",
+      "computedHash": "0dcbec9380651de430ce900f95e5ebcd93bb85cd371911df9f098a5baf29c50e"
+    },
+    "rust-systems-programming": {
+      "source": "manutej/luxor-claude-marketplace",
+      "sourceType": "github",
+      "skillPath": "plugins/luxor-backend-toolkit/skills/rust-systems-programming/SKILL.md",
+      "computedHash": "02c1ce6361900a24843b112507f0f124537b8de5933cb8939e39d3c8cbcdf16b"
+    }
+  }
+}

@@ -1,0 +1,12 @@
+# Rust build artifacts
+libzmq_rust/target/
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
