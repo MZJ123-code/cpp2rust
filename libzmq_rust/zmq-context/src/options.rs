@@ -48,7 +48,15 @@ pub struct SocketOptions {
 
     // PUB/SUB
     pub xpub_verbose: bool,
+    pub xpub_verboser: bool,
     pub xpub_nodrop: bool,
+    pub xpub_manual: bool,
+    pub xpub_manual_last_value: bool,
+    pub xpub_welcome_msg: Vec<u8>,
+    pub invert_matching: bool,
+    pub xsub_verbose_unsubscribe: bool,
+    pub only_first_subscribe: bool,
+    pub topics_count: i32,
     pub subscribe: Vec<Vec<u8>>,
     pub unsubscribe: Vec<Vec<u8>>,
 
@@ -67,6 +75,10 @@ pub struct SocketOptions {
     pub rate: i32,
     pub recovery_ivl: i32,
     pub multicast_hops: i32,
+
+    // REQ socket options
+    pub req_correlate: bool,
+    pub req_relaxed: bool,
 
     // Misc
     pub rcvbuf: i32,
@@ -103,7 +115,15 @@ impl Default for SocketOptions {
             plain_password: String::new(),
             zap_domain: String::new(),
             xpub_verbose: false,
+            xpub_verboser: false,
             xpub_nodrop: false,
+            xpub_manual: false,
+            xpub_manual_last_value: false,
+            xpub_welcome_msg: Vec::new(),
+            invert_matching: false,
+            xsub_verbose_unsubscribe: false,
+            only_first_subscribe: false,
+            topics_count: 0,
             subscribe: Vec::new(),
             unsubscribe: Vec::new(),
             routing_id: Vec::new(),
@@ -116,6 +136,8 @@ impl Default for SocketOptions {
             rate: 100,
             recovery_ivl: 10000,
             multicast_hops: 1,
+            req_correlate: false,
+            req_relaxed: false,
             rcvbuf: 0,
             sndbuf: 0,
             tos: 0,

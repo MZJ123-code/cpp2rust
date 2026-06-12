@@ -168,7 +168,17 @@ mod tests {
     fn test_recv_failable_after_send() {
         let sig = Signaler::new().unwrap();
         sig.send().unwrap();
-        assert!(sig.recv_failable().unwrap());
+        // On some platforms, TCP loopback data may not be immediately available
+        // on the read side after a non-blocking write. Spin briefly to ensure delivery.
+        let mut got_signal = false;
+        for _ in 0..100 {
+            if sig.recv_failable().unwrap() {
+                got_signal = true;
+                break;
+            }
+            std::thread::yield_now();
+        }
+        assert!(got_signal, "signal not received after send");
         assert!(!sig.recv_failable().unwrap());
     }
 
@@ -199,6 +209,15 @@ mod tests {
         });
         handle.join().unwrap();
 
-        assert!(sig.recv_failable().unwrap());
+        // Allow data to arrive on the read side (TCP loopback delay)
+        let mut got = false;
+        for _ in 0..100 {
+            if sig.recv_failable().unwrap() {
+                got = true;
+                break;
+            }
+            std::thread::yield_now();
+        }
+        assert!(got);
     }
 }

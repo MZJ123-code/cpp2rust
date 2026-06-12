@@ -6,23 +6,24 @@
 //! - Inproc endpoint registry
 //! - Reaper thread (async socket cleanup)
 
+use std::collections::HashMap;
 use std::sync::Arc;
 use parking_lot::RwLock;
 use zmq_core::error::{ZmqError, ZmqResult};
 use zmq_core::socket_type::SocketType;
 use zmq_transport::inproc::InprocRegistry;
 use crate::socket::ZSocket;
-use crate::options::SocketOptions;
+
+pub(crate) struct ZContextInner {
+    pub(crate) io_threads: usize,
+    pub(crate) inproc_registry: RwLock<InprocRegistry>,
+    pub(crate) bound_sockets: RwLock<HashMap<String, Arc<RwLock<Vec<Arc<zmq_core::pipe::Pipe>>>>>>,
+    terminated: std::sync::atomic::AtomicBool,
+}
 
 /// Global ZeroMQ context — container for all sockets and shared state.
 pub struct ZContext {
-    inner: Arc<ZContextInner>,
-}
-
-pub(crate) struct ZContextInner {
-    io_threads: usize,
-    pub(crate) inproc_registry: RwLock<InprocRegistry>,
-    terminated: std::sync::atomic::AtomicBool,
+    pub(crate) inner: Arc<ZContextInner>,
 }
 
 impl ZContext {
@@ -32,6 +33,7 @@ impl ZContext {
             inner: Arc::new(ZContextInner {
                 io_threads: 1,
                 inproc_registry: RwLock::new(InprocRegistry::new()),
+                bound_sockets: RwLock::new(HashMap::new()),
                 terminated: std::sync::atomic::AtomicBool::new(false),
             }),
         }

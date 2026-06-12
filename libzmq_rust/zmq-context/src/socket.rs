@@ -25,12 +25,14 @@ pub struct ZSocket {
     inner: RwLock<Box<dyn Socket>>,
     options: RwLock<SocketOptions>,
     endpoints: RwLock<Vec<String>>,
-    pipes: RwLock<Vec<Arc<Pipe>>>,
+    pipes: Arc<RwLock<Vec<Arc<Pipe>>>>,
+    /// Track how many pipes have been attached to inner (for incremental attach)
+    attached_pipe_count: RwLock<usize>,
 }
 
 impl ZSocket {
     pub(crate) fn new(ctx: Arc<ZContextInner>, typ: SocketType) -> Self {
-        Self { ctx, socket_type: typ, inner: RwLock::new(Self::create_socket_impl(typ)), options: RwLock::new(SocketOptions::default()), endpoints: RwLock::new(Vec::new()), pipes: RwLock::new(Vec::new()) }
+        Self { ctx, socket_type: typ, inner: RwLock::new(Self::create_socket_impl(typ)), options: RwLock::new(SocketOptions::default()), endpoints: RwLock::new(Vec::new()), pipes: Arc::new(RwLock::new(Vec::new())), attached_pipe_count: RwLock::new(0) }
     }
 
     fn create_socket_impl(typ: SocketType) -> Box<dyn Socket> {
@@ -53,16 +55,22 @@ impl ZSocket {
     pub fn connect(&self, endpoint: &str) -> ZmqResult<()> {
         self.endpoints.write().push(endpoint.to_string());
         if endpoint.starts_with("inproc://") {
-            // Create pipe pair for inproc connection
-            let (p1, p2) = Pipe::new_pair(0);
-            // Attach one end to us
-            self.pipes.write().push(p1.clone());
-            self.inner.write().attach_pipe(p1, false, true);
-            // Store the other end for the bound socket
-            // (bound socket must exist; the connect-before-bind case is handled)
             let name = endpoint.strip_prefix("inproc://").unwrap_or("");
-            let mut registry = self.ctx.inproc_registry.write();
-            let _ = registry.bind(name); // ensure entry exists
+            // Create pipe pair
+            let (client_pipe, server_pipe) = Pipe::new_pair(0);
+            // Attach client pipe to us (connecting side)
+            self.pipes.write().push(client_pipe.clone());
+            self.inner.write().attach_pipe(client_pipe, false, true);
+            // Deliver server pipe to the bound socket, or queue for later
+            let bound_sockets = self.ctx.bound_sockets.read();
+            if let Some(peer_pipes) = bound_sockets.get(name) {
+                peer_pipes.write().push(server_pipe.clone());
+            } else {
+                // connect-before-bind: queue in registry
+                drop(bound_sockets);
+                let mut registry = self.ctx.inproc_registry.write();
+                registry.queue_pipe(name, server_pipe);
+            }
         }
         Ok(())
     }
@@ -71,37 +79,81 @@ impl ZSocket {
         self.endpoints.write().push(endpoint.to_string());
         if endpoint.starts_with("inproc://") {
             let name = endpoint.strip_prefix("inproc://").unwrap_or("");
-            let mut registry = self.ctx.inproc_registry.write();
-            let bind_result = registry.bind(name)?;
-            // Check for pending connections (connect-before-bind)
-            while let Some(peer_stream) = bind_result.try_accept() {
-                let (p1, p2) = Pipe::new_pair(0);
-                self.pipes.write().push(p1.clone());
-                self.inner.write().attach_pipe(p1, false, false);
-                // TODO: attach p2 to the peer socket
-                drop(p2);
-                drop(peer_stream);
+            // Register our pipes list so connecting sockets can deliver to us
+            self.ctx.bound_sockets.write().insert(name.to_string(), self.pipes.clone());
+            // Process any pending pipes from connect-before-bind
+            let pending = {
+                let registry = self.ctx.inproc_registry.read();
+                registry.take_pending(name)
+            };
+            for pipe in pending {
+                self.pipes.write().push(pipe.clone());
+                self.inner.write().attach_pipe(pipe, false, false);
             }
         }
         Ok(())
     }
 
+    /// Attach any newly added pipes (from concurrent connect calls) to the inner socket.
+    fn sync_pipes(&self) {
+        loop {
+            let pipe_count = self.pipes.read().len();
+            let mut attached = self.attached_pipe_count.write();
+            if *attached >= pipe_count {
+                return;
+            }
+            let idx = *attached;
+            *attached += 1;
+            let pipe = {
+                let pipes = self.pipes.read();
+                pipes[idx].clone()
+            };
+            drop(attached);
+            self.inner.write().attach_pipe(pipe.clone(), false, false);
+            self.inner.write().write_activated(&pipe);
+        }
+    }
+
+    /// Activate pipes that have data available for reading.
+    fn activate_read_pipes(&self) {
+        for pipe in self.pipes.read().iter() {
+            if pipe.check_read_from_socket() {
+                self.inner.write().read_activated(pipe);
+            }
+        }
+    }
+
     pub fn send(&self, msg: impl Into<ZmqMessage>, flags: SendFlags) -> ZmqResult<()> {
+        self.sync_pipes();
         let mut msg = msg.into();
         msg.set_more(flags.contains(SendFlags::SNDMORE));
         if flags.contains(SendFlags::DONTWAIT) && !self.inner.read().xhas_out() { return Err(ZmqError::WouldBlock); }
+        self.activate_read_pipes();
         self.inner.write().xsend(msg)
     }
     pub fn recv(&self, flags: RecvFlags) -> ZmqResult<ZmqMessage> {
+        self.sync_pipes();
+        self.activate_read_pipes();
         if flags.contains(RecvFlags::DONTWAIT) && !self.inner.read().xhas_in() { return Err(ZmqError::WouldBlock); }
         self.inner.write().xrecv()
     }
-    pub fn has_in(&self) -> bool { self.inner.read().xhas_in() }
-    pub fn has_out(&self) -> bool { self.inner.read().xhas_out() }
+    pub fn has_in(&self) -> bool { self.sync_pipes(); self.activate_read_pipes(); self.inner.read().xhas_in() }
+    pub fn has_out(&self) -> bool { self.sync_pipes(); self.inner.read().xhas_out() }
     pub fn get_options(&self) -> SocketOptions { self.options.read().clone() }
     pub fn socket_type(&self) -> SocketType { self.socket_type }
-    pub fn subscribe(&self, prefix: &[u8]) -> ZmqResult<()> { self.options.write().subscribe.push(prefix.to_vec()); Ok(()) }
-    pub fn unsubscribe(&self, prefix: &[u8]) -> ZmqResult<()> { self.options.write().unsubscribe.retain(|s| s.as_slice() != prefix); Ok(()) }
+    pub fn subscribe(&self, prefix: &[u8]) -> ZmqResult<()> {
+        self.options.write().subscribe.push(prefix.to_vec());
+        // Propagate to inner socket for subscription filtering
+        let subs = self.options.read().subscribe.clone();
+        self.inner.write().set_subscriptions(&subs);
+        Ok(())
+    }
+    pub fn unsubscribe(&self, prefix: &[u8]) -> ZmqResult<()> {
+        self.options.write().subscribe.retain(|s| s.as_slice() != prefix);
+        let subs = self.options.read().subscribe.clone();
+        self.inner.write().set_subscriptions(&subs);
+        Ok(())
+    }
 
     // ── Socket option setters ──────────────────────────────────
 
@@ -131,9 +183,18 @@ impl ZSocket {
     pub fn set_routing_id(&self, id: &[u8]) -> ZmqResult<()> { self.options.write().routing_id = id.to_vec(); Ok(()) }
     pub fn set_router_mandatory(&self, v: bool) -> ZmqResult<()> { self.options.write().router_mandatory = v; Ok(()) }
     pub fn set_router_handover(&self, v: bool) -> ZmqResult<()> { self.options.write().router_handover = v; Ok(()) }
+    pub fn set_req_correlate(&self, v: bool) -> ZmqResult<()> { self.options.write().req_correlate = v; Ok(()) }
+    pub fn set_req_relaxed(&self, v: bool) -> ZmqResult<()> { self.options.write().req_relaxed = v; Ok(()) }
     pub fn set_probe_router(&self, v: bool) -> ZmqResult<()> { self.options.write().probe_router = v; Ok(()) }
     pub fn set_xpub_verbose(&self, v: bool) -> ZmqResult<()> { self.options.write().xpub_verbose = v; Ok(()) }
+    pub fn set_xpub_verboser(&self, v: bool) -> ZmqResult<()> { self.options.write().xpub_verboser = v; Ok(()) }
     pub fn set_xpub_nodrop(&self, v: bool) -> ZmqResult<()> { self.options.write().xpub_nodrop = v; Ok(()) }
+    pub fn set_xpub_manual(&self, v: bool) -> ZmqResult<()> { self.options.write().xpub_manual = v; Ok(()) }
+    pub fn set_xpub_manual_last_value(&self, v: bool) -> ZmqResult<()> { self.options.write().xpub_manual_last_value = v; Ok(()) }
+    pub fn set_xpub_welcome_msg(&self, msg: &[u8]) -> ZmqResult<()> { self.options.write().xpub_welcome_msg = msg.to_vec(); Ok(()) }
+    pub fn set_invert_matching(&self, v: bool) -> ZmqResult<()> { self.options.write().invert_matching = v; Ok(()) }
+    pub fn set_xsub_verbose_unsubscribe(&self, v: bool) -> ZmqResult<()> { self.options.write().xsub_verbose_unsubscribe = v; Ok(()) }
+    pub fn set_only_first_subscribe(&self, v: bool) -> ZmqResult<()> { self.options.write().only_first_subscribe = v; Ok(()) }
     pub fn set_heartbeat_ivl(&self, ms: i32) -> ZmqResult<()> { self.options.write().heartbeat_ivl = ms; Ok(()) }
     pub fn set_heartbeat_timeout(&self, ms: i32) -> ZmqResult<()> { self.options.write().heartbeat_timeout = ms; Ok(()) }
     pub fn set_heartbeat_ttl(&self, ttl: i32) -> ZmqResult<()> { self.options.write().heartbeat_ttl = ttl; Ok(()) }
@@ -161,6 +222,7 @@ impl ZSocket {
     pub fn routing_id(&self) -> Vec<u8> { self.options.read().routing_id.clone() }
     pub fn heartbeat_ivl(&self) -> i32 { self.options.read().heartbeat_ivl }
     pub fn heartbeat_timeout(&self) -> i32 { self.options.read().heartbeat_timeout }
+    pub fn topics_count(&self) -> i32 { self.options.read().subscribe.len() as i32 }
 
     pub fn close(self) -> ZmqResult<()> { Ok(()) }
 }

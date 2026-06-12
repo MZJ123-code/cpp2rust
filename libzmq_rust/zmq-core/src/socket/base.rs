@@ -62,6 +62,10 @@ pub trait Socket: Send + Sync {
     fn can_recv(&self) -> bool {
         self.socket_type().can_recv()
     }
+
+    /// Set subscriptions for filtering socket (e.g. SUB).
+    /// Default implementation is a no-op.
+    fn set_subscriptions(&mut self, _subs: &[Vec<u8>]) {}
 }
 
 /// A simpler, object-safe socket handle for use in generic contexts.
@@ -90,4 +94,5 @@ impl Socket for SocketHandle {
     fn read_activated(&mut self, p: &Pipe) { self.inner.read_activated(p) }
     fn write_activated(&mut self, p: &Pipe) { self.inner.write_activated(p) }
     fn socket_type(&self) -> SocketType { self.socket_type }
+    fn set_subscriptions(&mut self, subs: &[Vec<u8>]) { self.inner.set_subscriptions(subs) }
 }
