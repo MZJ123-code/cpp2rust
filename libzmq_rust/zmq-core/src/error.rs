@@ -1,4 +1,20 @@
 //! Error types for zmq-core.
+//!
+//! `ZmqError` provides detailed, categorised errors for all ZeroMQ operations.
+//! Each variant maps to a specific failure domain (protocol, codec, network,
+//! security, state), enabling precise error handling and recovery decisions.
+//!
+//! # Error categories
+//!
+//! | Variant | Domain | Recoverable |
+//! |---------|--------|-------------|
+//! | `Protocol` / `Codec` | ZMTP wire protocol | Usually not |
+//! | `Network` | Transport layer | Sometimes (retry) |
+//! | `Security` | Authentication / encryption | Depends on context |
+//! | `InvalidState` | Socket state machine | No (programming error) |
+//! | `BufferFull` / `WouldBlock` | Flow control | Yes (retry later) |
+//! | `NoPeer` | No connections | Yes (wait for peer) |
+//! | `ContextTerminated` | Shutdown | No (cleanup) |
 
 use thiserror::Error;
 

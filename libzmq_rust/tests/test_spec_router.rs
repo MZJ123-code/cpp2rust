@@ -72,7 +72,7 @@ fn destroy_queue_on_disconnect(_ctx: &TestContext) {
 }
 
 #[test]
-#[ignore = "ROUTER socket not yet implemented"]
+#[ignore = "ROUTER socket xrecv not yet implemented"]
 fn test_fair_queue_in_inproc() {
     let ctx = TestContext::new();
     fair_queue_in(&ctx);

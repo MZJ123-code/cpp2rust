@@ -53,7 +53,7 @@ fn invalid_rep(ctx: &TestContext) {
 }
 
 #[test]
-#[ignore = "REQ/ROUTER socket state machine not yet implemented"]
+#[ignore = "ROUTER socket xrecv not yet implemented"]
 fn test_invalid_rep_inproc() {
     let ctx = TestContext::new();
     invalid_rep(&ctx);

@@ -13,7 +13,8 @@ cargo build --release
 
 # 运行全部测试
 cargo test
-# → 164 passed, 0 failed, 0 ignored
+# → 209 passed, 0 failed, 205 ignored（2026-06-12）
+# 忽略的测试对应尚未实现的功能（TCP/IPC传输、CURVE安全、poll等）
 
 # 运行性能基准
 cargo run --example inproc_thr --release         # 吞吐测试
@@ -63,8 +64,10 @@ cargo test
 | zmq-core | 107 | — |
 | zmq-transport | 10 | — |
 | zmq-context | 2 | — |
-| libzmq_rust (顶层) | — | 45 |
-| **总计** | **119** | **45 = 164** |
+| libzmq_rust (顶层) | — | 90 |
+| **总计** | **119** | **90 = 209 passed** |
+
+> **注**：205 个测试被标记为 `#[ignore]`，对应 TCP/IPC 传输、CURVE 安全、ZAP 认证等尚未完成的 Phase。
 
 ### C++ → Rust 测试 1:1 映射（25 个文件）
 
@@ -157,16 +160,20 @@ mean throughput: 2865.672 [Mb/s]
 
 ### Rust 性能对比
 
-| 基准 | C++ | Rust | 比率 | 结论 |
+| 基准 | C++ | Rust | 比率 | 说明 |
 |------|-----|------|------|------|
-| inproc_thr (30B VSM) | 11,940,298 msg/s | **14,454,836 msg/s** | **121%** | ✅ 超过 95% |
-| inproc_lat (30B) | 8.414 us | 0.100 us | — | 单线程 vs 多线程，不可直接对比 |
-| radix_tree | 103.0 ns | **55.6 ns** | **185%** | ✅ 超过 95% |
+| inproc_thr (30B) | 11,940,298 msg/s | 待实测 | — | 完整 PUSH→PULL socket 路径 |
+| inproc_lat (30B) | 8.414 us | 待实测 | — | REQ→REP 往返延迟 |
+| radix_tree | 103.0 ns | **55.6 ns** | **185%** | ✅ 相同数据结构，公平对比 |
 | trie | 198.4 ns | 458.9 ns | 43% | 待优化 |
 
-> **结论**：inproc_thr 吞吐 **121%** 和 radix_tree 查找 **185%** 均超过 C++，达到 ≥95% 要求。
+> **说明**：
+> - `inproc_thr` 和 `inproc_lat` 现使用完整 socket 路径（ZContext/ZSocket API），与 C++ 基准测试范围一致，确保公平对比。
+> - `radix_tree`/`trie` 是纯数据结构基准，测量路径完全一致（相同算法、相同数据结构）。
+> - **VSM 优化**：Rust 对 ≤30 字节消息采用内联存储（零堆分配），与 C++ `msg_t` VSM 机制对等。
+> - 运行性能基准：`cargo run --example inproc_thr --release`
 >
-> 说明：C++ `inproc_thr` 测量的是完整 PUSH→PULL socket 路径（含 socket 层、lb_t/fq_t 调度器），Rust 测量裸 ypipe。30B 场景下 Rust VSM（内联存储，零堆分配）与 C++ msg_t VSM 对等比较。
+> **结论**：radix_tree 查找 **185%** 超过 C++ 基线，数据结构层性能达标。完整 socket 路径性能待实测验证。
 
 ---
 

@@ -366,6 +366,9 @@ impl Socket for ReqSocket {
     fn socket_type(&self) -> SocketType {
         SocketType::Req
     }
+
+    fn set_req_correlate(&mut self, v: bool) { self.correlate = v; }
+    fn set_req_relaxed(&mut self, v: bool) { self.strict = !v; }
 }
 
 #[cfg(test)]
@@ -383,8 +386,8 @@ mod tests {
 
     /// Helper: write a message from the "peer" side to simulate receiving data.
     fn simulate_recv(peer_pipe: &Pipe, msg: ZmqMessage) {
-        peer_pipe.write_to_socket(msg, false);
-        peer_pipe.flush_to_socket();
+        peer_pipe.write_to_session(msg, false);
+        peer_pipe.flush_to_session();
     }
 
     #[test]

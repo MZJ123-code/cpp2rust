@@ -12,7 +12,7 @@ fn ep_inproc(name: &str) -> String {
 }
 
 #[test]
-#[ignore = "PUB/SUB socket not yet implemented"]
+#[ignore = "XPUB/XSUB publish-forward not yet implemented"]
 fn test() {
     let ctx = TestContext::new();
 

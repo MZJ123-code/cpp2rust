@@ -19,11 +19,11 @@ impl Socket for PairSocket {
     }
     fn xrecv(&mut self) -> ZmqResult<ZmqMessage> {
         match &self.pipe {
-            Some(p) if p.check_read_from_socket() => p.read_from_socket().ok_or(ZmqError::NoMessage),
+            Some(p) if p.check_read_from_session() => p.read_from_session().ok_or(ZmqError::NoMessage),
             _ => Err(ZmqError::NoMessage),
         }
     }
-    fn xhas_in(&self) -> bool { self.pipe.as_ref().map(|p| p.check_read_from_socket()).unwrap_or(false) }
+    fn xhas_in(&self) -> bool { self.pipe.as_ref().map(|p| p.check_read_from_session()).unwrap_or(false) }
     fn xhas_out(&self) -> bool { self.pipe.as_ref().map(|p| p.is_active()).unwrap_or(false) }
     fn attach_pipe(&mut self, pipe: Arc<Pipe>, _sa: bool, _li: bool) { if self.pipe.is_none() { self.pipe = Some(pipe); } }
     fn pipe_terminated(&mut self, p: &Pipe) { if self.pipe.as_ref().map(|x| x.id() == p.id()).unwrap_or(false) { self.pipe = None; } }

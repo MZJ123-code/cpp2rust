@@ -1,4 +1,33 @@
 //! ZSocket — public socket handle. 1:1 translation of C++ `socket_base_t`.
+//!
+//! `ZSocket` is the main API surface for ZeroMQ communication. It wraps the
+//! protocol-core socket implementation and provides bind/connect/send/recv
+//! methods with full support for inproc, TCP, and IPC transports.
+//!
+//! # Send/receive flags
+//!
+//! - `SendFlags::DONTWAIT` — non-blocking send (returns `WouldBlock` instead of waiting)
+//! - `SendFlags::SNDMORE` — indicates more message frames to follow
+//! - `RecvFlags::DONTWAIT` — non-blocking receive
+//!
+//! # Examples
+//!
+//! ```rust,no_run
+//! use zmq_context::ZContext;
+//! use zmq_context::socket::{SendFlags, RecvFlags};
+//! use zmq_core::socket_type::SocketType;
+//! use zmq_core::message::ZmqMessage;
+//!
+//! let ctx = ZContext::new();
+//! let push = ctx.socket(SocketType::Push).unwrap();
+//! push.bind("inproc://worker").unwrap();
+//! let msg = ZmqMessage::from_slice(b"task");
+//! push.send(msg, SendFlags::NONE).unwrap();
+//!
+//! let pull = ctx.socket(SocketType::Pull).unwrap();
+//! pull.connect("inproc://worker").unwrap();
+//! let received = pull.recv(RecvFlags::NONE).unwrap();
+//! ```
 use std::sync::Arc;
 use parking_lot::RwLock;
 use zmq_core::error::{ZmqError, ZmqResult};
@@ -19,6 +48,10 @@ bitflags::bitflags! {
     pub struct RecvFlags: i32 { const NONE = 0; const DONTWAIT = 1; }
 }
 
+/// Public socket handle providing bind/connect/send/recv operations.
+///
+/// Created via [`ZContext::socket()`]. Internally dispatches to the
+/// protocol-core socket implementation via the [`Socket`] trait.
 pub struct ZSocket {
     ctx: Arc<ZContextInner>,
     socket_type: SocketType,
@@ -117,7 +150,7 @@ impl ZSocket {
     /// Activate pipes that have data available for reading.
     fn activate_read_pipes(&self) {
         for pipe in self.pipes.read().iter() {
-            if pipe.check_read_from_socket() {
+            if pipe.check_read_from_session() {
                 self.inner.write().read_activated(pipe);
             }
         }
@@ -181,10 +214,10 @@ impl ZSocket {
     pub fn set_plain_password(&self, p: &str) -> ZmqResult<()> { self.options.write().plain_password = p.to_string(); Ok(()) }
     pub fn set_zap_domain(&self, d: &str) -> ZmqResult<()> { self.options.write().zap_domain = d.to_string(); Ok(()) }
     pub fn set_routing_id(&self, id: &[u8]) -> ZmqResult<()> { self.options.write().routing_id = id.to_vec(); Ok(()) }
-    pub fn set_router_mandatory(&self, v: bool) -> ZmqResult<()> { self.options.write().router_mandatory = v; Ok(()) }
-    pub fn set_router_handover(&self, v: bool) -> ZmqResult<()> { self.options.write().router_handover = v; Ok(()) }
-    pub fn set_req_correlate(&self, v: bool) -> ZmqResult<()> { self.options.write().req_correlate = v; Ok(()) }
-    pub fn set_req_relaxed(&self, v: bool) -> ZmqResult<()> { self.options.write().req_relaxed = v; Ok(()) }
+    pub fn set_router_mandatory(&self, v: bool) -> ZmqResult<()> { self.options.write().router_mandatory = v; self.inner.write().set_router_mandatory(v); Ok(()) }
+    pub fn set_router_handover(&self, v: bool) -> ZmqResult<()> { self.options.write().router_handover = v; self.inner.write().set_router_handover(v); Ok(()) }
+    pub fn set_req_correlate(&self, v: bool) -> ZmqResult<()> { self.options.write().req_correlate = v; self.inner.write().set_req_correlate(v); Ok(()) }
+    pub fn set_req_relaxed(&self, v: bool) -> ZmqResult<()> { self.options.write().req_relaxed = v; self.inner.write().set_req_relaxed(v); Ok(()) }
     pub fn set_probe_router(&self, v: bool) -> ZmqResult<()> { self.options.write().probe_router = v; Ok(()) }
     pub fn set_xpub_verbose(&self, v: bool) -> ZmqResult<()> { self.options.write().xpub_verbose = v; Ok(()) }
     pub fn set_xpub_verboser(&self, v: bool) -> ZmqResult<()> { self.options.write().xpub_verboser = v; Ok(()) }

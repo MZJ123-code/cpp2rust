@@ -227,7 +227,7 @@ impl Socket for XsubSocket {
                     continue;
                 }
                 // Try to read a message from this pipe's inbound queue.
-                if let Some(msg) = pipe.read_from_socket() {
+                if let Some(msg) = pipe.read_from_session() {
                     received = true;
                     // Check if this is a continuation of a multi-part message,
                     // or if subscription filtering is disabled, or if it matches.
@@ -238,7 +238,7 @@ impl Socket for XsubSocket {
                             // Drain remaining parts.
                             let mut drain_msg = msg;
                             while drain_msg.more() {
-                                if let Some(next) = pipe.read_from_socket() {
+                                if let Some(next) = pipe.read_from_session() {
                                     drain_msg = next;
                                 } else {
                                     break;
@@ -280,7 +280,7 @@ impl Socket for XsubSocket {
         // true if any pipe has data available.
         self.pipes
             .iter()
-            .any(|p| p.is_active() && p.check_read_from_socket())
+            .any(|p| p.is_active() && p.check_read_from_session())
     }
 
     fn xhas_out(&self) -> bool {

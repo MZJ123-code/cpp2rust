@@ -14,7 +14,7 @@
 //! - Only one peer writes to `to_socket` (the session/acceptor)
 //! - Only one peer reads from `to_socket` (the socket/initiator)
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use crate::data_structures::ypipe::YPipe;
@@ -22,6 +22,13 @@ use crate::message::ZmqMessage;
 
 /// Opaque pipe identity.
 pub type PipeId = usize;
+
+/// Global pipe ID counter — ensures unique IDs across all pipe pairs.
+static NEXT_PIPE_ID: AtomicUsize = AtomicUsize::new(1);
+
+fn next_pipe_id() -> PipeId {
+    NEXT_PIPE_ID.fetch_add(2, Ordering::Relaxed)
+}
 
 /// Bidirectional pipe between Socket and Session.
 ///
@@ -52,34 +59,37 @@ impl Pipe {
         }
     }
 
-    /// Create a connected pipe pair — two pipes sharing the same underlying queues.
+    /// Create a connected pipe pair with crossed queues and unique IDs.
     ///
-    /// Pipe A writes to `to_session` → Pipe B reads from `to_session`.
-    /// Pipe B writes to `to_socket`   → Pipe A reads from `to_socket`.
+    /// Pipe A writes to `to_session` → Pipe B reads from `to_socket`.
+    /// Pipe B writes to `to_session` → Pipe A reads from `to_socket`.
     ///
-    /// This matches C++ libzmq's `make_pipe_pair()` behavior where two pipes
-    /// are created with shared SPSC queues for bidirectional communication.
-    pub fn new_pair(id: PipeId) -> (Arc<Pipe>, Arc<Pipe>) {
-        // Create shared underlying queues
-        let to_session: Arc<parking_lot::Mutex<YPipe<ZmqMessage>>> =
+    /// This matches the C++ libzmq pattern where the session layer connects
+    /// each pipe's outgoing queue to the other pipe's incoming queue.
+    /// - A's outgoing (to_session) = B's incoming (to_socket)
+    /// - B's outgoing (to_session) = A's incoming (to_socket)
+    pub fn new_pair(_id: PipeId) -> (Arc<Pipe>, Arc<Pipe>) {
+        let id = next_pipe_id();
+        // Create two queues: a_to_b (A sends data to B) and b_to_a (B sends data to A)
+        let a_to_b: Arc<parking_lot::Mutex<YPipe<ZmqMessage>>> =
             Arc::new(parking_lot::Mutex::new(YPipe::new()));
-        let to_socket: Arc<parking_lot::Mutex<YPipe<ZmqMessage>>> =
+        let b_to_a: Arc<parking_lot::Mutex<YPipe<ZmqMessage>>> =
             Arc::new(parking_lot::Mutex::new(YPipe::new()));
 
         let a = Arc::new(Pipe {
             id,
             terminated: AtomicBool::new(false),
             delay_termination: AtomicBool::new(false),
-            to_session: Arc::clone(&to_session),
-            to_socket: Arc::clone(&to_socket),
+            to_session: Arc::clone(&a_to_b),  // A's outgoing → a_to_b
+            to_socket: Arc::clone(&b_to_a),    // A's incoming ← b_to_a
         });
 
         let b = Arc::new(Pipe {
-            id: id.wrapping_add(1),
+            id: id + 1,
             terminated: AtomicBool::new(false),
             delay_termination: AtomicBool::new(false),
-            to_session, // move the last ref into b
-            to_socket,  // move the last ref into b
+            to_session: b_to_a,   // B's outgoing → b_to_a
+            to_socket: a_to_b,     // B's incoming ← a_to_b
         });
 
         (a, b)
@@ -174,11 +184,12 @@ mod tests {
         let (p1, p2) = Pipe::new_pair(1);
         let msg = ZmqMessage::from_slice(b"hello");
 
-        // p1 writes to session (to_session queue), p2 reads from socket (same to_session queue)
+        // p1 writes to session (to_session = a_to_b queue), p2 reads from session
+        // (to_socket = a_to_b queue) — crossed: p1's outgoing = p2's incoming
         p1.write_to_session(msg, false);
         p1.flush_to_session();
-        assert!(p2.check_read_from_socket());
-        let received = p2.read_from_socket().unwrap();
+        assert!(p2.check_read_from_session());
+        let received = p2.read_from_session().unwrap();
         assert_eq!(received.data(), b"hello");
     }
 
@@ -186,15 +197,15 @@ mod tests {
     fn test_pipe_bidirectional() {
         let (p1, p2) = Pipe::new_pair(1);
 
-        // App → Network (p1 writes to_session, p2 reads to_session)
+        // p1 sends to p2: p1 writes to_session → a_to_b, p2 reads to_socket → a_to_b
         p1.write_to_session(ZmqMessage::from_slice(b"req"), false);
         p1.flush_to_session();
-        assert!(p2.check_read_from_socket());
-        assert_eq!(p2.read_from_socket().unwrap().data(), b"req");
+        assert!(p2.check_read_from_session());
+        assert_eq!(p2.read_from_session().unwrap().data(), b"req");
 
-        // Network → App (p2 writes to_socket, p1 reads to_socket)
-        p2.write_to_socket(ZmqMessage::from_slice(b"rep"), false);
-        p2.flush_to_socket();
+        // p2 sends to p1: p2 writes to_session → b_to_a, p1 reads to_socket → b_to_a
+        p2.write_to_session(ZmqMessage::from_slice(b"rep"), false);
+        p2.flush_to_session();
         assert!(p1.check_read_from_session());
         assert_eq!(p1.read_from_session().unwrap().data(), b"rep");
     }

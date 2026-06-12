@@ -66,6 +66,15 @@ pub trait Socket: Send + Sync {
     /// Set subscriptions for filtering socket (e.g. SUB).
     /// Default implementation is a no-op.
     fn set_subscriptions(&mut self, _subs: &[Vec<u8>]) {}
+
+    /// Set REQ correlate option.
+    fn set_req_correlate(&mut self, _v: bool) {}
+    /// Set REQ relaxed option.
+    fn set_req_relaxed(&mut self, _v: bool) {}
+    /// Set ROUTER mandatory option.
+    fn set_router_mandatory(&mut self, _v: bool) {}
+    /// Set ROUTER handover option.
+    fn set_router_handover(&mut self, _v: bool) {}
 }
 
 /// A simpler, object-safe socket handle for use in generic contexts.
@@ -95,4 +104,8 @@ impl Socket for SocketHandle {
     fn write_activated(&mut self, p: &Pipe) { self.inner.write_activated(p) }
     fn socket_type(&self) -> SocketType { self.socket_type }
     fn set_subscriptions(&mut self, subs: &[Vec<u8>]) { self.inner.set_subscriptions(subs) }
+    fn set_req_correlate(&mut self, v: bool) { self.inner.set_req_correlate(v) }
+    fn set_req_relaxed(&mut self, v: bool) { self.inner.set_req_relaxed(v) }
+    fn set_router_mandatory(&mut self, v: bool) { self.inner.set_router_mandatory(v) }
+    fn set_router_handover(&mut self, v: bool) { self.inner.set_router_handover(v) }
 }

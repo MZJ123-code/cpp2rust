@@ -38,7 +38,6 @@ fn setup_relaxed(ctx: &TestContext, name: &str) -> (Vec<zmq_context::ZSocket>, z
 }
 
 #[test]
-#[ignore = "REQ state machine not yet implemented"]
 fn test_case_1() {
     let ctx = TestContext::new();
     let (reps, req) = setup_relaxed(&ctx, "relaxed1");
@@ -80,7 +79,6 @@ fn test_case_1() {
 }
 
 #[test]
-#[ignore = "REQ state machine not yet implemented"]
 fn test_case_2() {
     let ctx = TestContext::new();
     let (reps, req) = setup_relaxed(&ctx, "relaxed2");
@@ -124,7 +122,6 @@ fn test_case_2() {
 }
 
 #[test]
-#[ignore = "REQ state machine not yet implemented"]
 fn test_case_3() {
     let ctx = TestContext::new();
     let (reps, req) = setup_relaxed(&ctx, "relaxed3");
@@ -166,7 +163,7 @@ fn test_case_3() {
 }
 
 #[test]
-#[ignore = "REQ state machine not yet implemented"]
+#[ignore = "ROUTER socket xrecv not yet implemented"]
 fn test_case_4() {
     // Check issue #1695: responses to messages other than the last sent one
     // are correctly discarded by the REQ pipe

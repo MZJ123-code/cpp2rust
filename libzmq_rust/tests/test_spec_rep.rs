@@ -58,14 +58,13 @@ fn envelope(ctx: &TestContext) {
 }
 
 #[test]
-#[ignore = "REP socket not yet implemented"]
 fn test_fair_queue_in_inproc() {
     let ctx = TestContext::new();
     fair_queue_in(&ctx);
 }
 
 #[test]
-#[ignore = "REP socket not yet implemented"]
+#[ignore = "DEALER socket xrecv not yet implemented"]
 fn test_envelope_inproc() {
     let ctx = TestContext::new();
     envelope(&ctx);

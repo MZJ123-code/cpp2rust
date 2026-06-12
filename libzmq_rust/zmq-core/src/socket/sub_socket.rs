@@ -22,8 +22,8 @@ impl Socket for SubSocket {
     fn xsend(&mut self, _msg: ZmqMessage) -> ZmqResult<()> { Err(ZmqError::NotSupported("SUB")) }
     fn xrecv(&mut self) -> ZmqResult<ZmqMessage> {
         for pipe in &self.pipes {
-            if pipe.is_active() && pipe.check_read_from_socket() {
-                let msg = pipe.read_from_socket().ok_or(ZmqError::NoMessage)?;
+            if pipe.is_active() && pipe.check_read_from_session() {
+                let msg = pipe.read_from_session().ok_or(ZmqError::NoMessage)?;
                 // Check subscription matching
                 if self.subscriptions.is_empty() || self.matches_subscription(&msg) {
                     return Ok(msg);
@@ -34,7 +34,7 @@ impl Socket for SubSocket {
         Err(ZmqError::NoMessage)
     }
     fn xhas_in(&self) -> bool {
-        self.pipes.iter().any(|p| p.is_active() && p.check_read_from_socket())
+        self.pipes.iter().any(|p| p.is_active() && p.check_read_from_session())
     }
     fn xhas_out(&self) -> bool { false }
     fn attach_pipe(&mut self, p: Arc<Pipe>, sub_all: bool, _li: bool) {

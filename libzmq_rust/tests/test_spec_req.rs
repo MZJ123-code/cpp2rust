@@ -66,14 +66,13 @@ fn req_message_format(ctx: &TestContext) {
 }
 
 #[test]
-#[ignore = "REQ socket not yet implemented"]
 fn test_round_robin_out_inproc() {
     let ctx = TestContext::new();
     round_robin_out(&ctx);
 }
 
 #[test]
-#[ignore = "REQ socket not yet implemented"]
+#[ignore = "ROUTER socket xrecv not yet implemented"]
 fn test_req_message_format_inproc() {
     let ctx = TestContext::new();
     req_message_format(&ctx);

@@ -44,16 +44,16 @@ impl Socket for ChannelSocket {
 
         // Read and drop multi-frame messages
         loop {
-            if !pipe.check_read_from_socket() {
+            if !pipe.check_read_from_session() {
                 return Err(ZmqError::NoMessage);
             }
-            let msg = pipe.read_from_socket().ok_or(ZmqError::NoMessage)?;
+            let msg = pipe.read_from_session().ok_or(ZmqError::NoMessage)?;
             if !msg.more() {
                 return Ok(msg);
             }
             // Drop multi-frame messages (C++ channel drops all frames with more flag)
-            while pipe.check_read_from_socket() {
-                let inner = pipe.read_from_socket().ok_or(ZmqError::NoMessage)?;
+            while pipe.check_read_from_session() {
+                let inner = pipe.read_from_session().ok_or(ZmqError::NoMessage)?;
                 if !inner.more() {
                     break;
                 }
@@ -62,7 +62,7 @@ impl Socket for ChannelSocket {
     }
 
     fn xhas_in(&self) -> bool {
-        self.pipe.as_ref().map(|p| p.check_read_from_socket()).unwrap_or(false)
+        self.pipe.as_ref().map(|p| p.check_read_from_session()).unwrap_or(false)
     }
 
     fn xhas_out(&self) -> bool {

@@ -5,6 +5,26 @@
 //! - Socket registry
 //! - Inproc endpoint registry
 //! - Reaper thread (async socket cleanup)
+//!
+//! # Examples
+//!
+//! ```rust,no_run
+//! use zmq_context::ZContext;
+//! use zmq_context::socket::{SendFlags, RecvFlags};
+//! use zmq_core::socket_type::SocketType;
+//! use zmq_core::message::ZmqMessage;
+//!
+//! let ctx = ZContext::new();
+//! let rep = ctx.socket(SocketType::Rep).unwrap();
+//! rep.bind("inproc://hello").unwrap();
+//!
+//! let req = ctx.socket(SocketType::Req).unwrap();
+//! req.connect("inproc://hello").unwrap();
+//!
+//! let msg = ZmqMessage::from_slice(b"Hello");
+//! req.send(msg, SendFlags::NONE).unwrap();
+//! let reply = rep.recv(RecvFlags::NONE).unwrap();
+//! ```
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -22,6 +42,40 @@ pub(crate) struct ZContextInner {
 }
 
 /// Global ZeroMQ context — container for all sockets and shared state.
+///
+/// `ZContext` is the starting point for any ZeroMQ application. It manages
+/// the IO thread pool, socket lifecycle, and inproc endpoint registry.
+///
+/// # Thread safety
+///
+/// `ZContext` is `Send + Sync` — a single context can be shared across
+/// threads. Sockets created from the same context share the IO pool.
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// use zmq_context::ZContext;
+/// use zmq_context::socket::{SendFlags, RecvFlags};
+/// use zmq_core::socket_type::SocketType;
+/// use zmq_core::message::ZmqMessage;
+///
+/// let ctx = ZContext::new();
+///
+/// // Create a REP socket and bind
+/// let rep = ctx.socket(SocketType::Rep).unwrap();
+/// rep.bind("inproc://service").unwrap();
+///
+/// // Create a REQ socket and connect
+/// let req = ctx.socket(SocketType::Req).unwrap();
+/// req.connect("inproc://service").unwrap();
+///
+/// // Send a request
+/// let msg = ZmqMessage::from_slice(b"ping");
+/// req.send(msg, SendFlags::NONE).unwrap();
+/// let received = rep.recv(RecvFlags::NONE).unwrap();
+/// rep.send(received, SendFlags::NONE).unwrap();
+/// let reply = req.recv(RecvFlags::NONE).unwrap();
+/// ```
 pub struct ZContext {
     pub(crate) inner: Arc<ZContextInner>,
 }

@@ -3,7 +3,13 @@ name = "libzmq_rust"
 version = "0.1.0"
 edition = "2021"
 license = "MPL-2.0"
-description = "Pure Rust reimplementation of libzmq (ZeroMQ)"
+description = "Pure Rust reimplementation of libzmq (ZeroMQ) — high-performance asynchronous messaging library"
+authors = ["libzmq_rust contributors"]
+repository = "https://github.com/user/libzmq_rust"
+documentation = "https://docs.rs/libzmq_rust"
+readme = "../README.md"
+keywords = ["zeromq", "zmq", "messaging", "async", "sans-io", "networking"]
+categories = ["network-programming", "asynchronous", "concurrency"]
 
 [workspace]
 resolver = "2"

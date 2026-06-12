@@ -67,14 +67,14 @@ impl Socket for DgramSocket {
     fn xrecv(&mut self) -> ZmqResult<ZmqMessage> {
         let pipe = self.pipe.as_ref().ok_or(ZmqError::NoMessage)?;
 
-        if !pipe.check_read_from_socket() {
+        if !pipe.check_read_from_session() {
             return Err(ZmqError::NoMessage);
         }
-        pipe.read_from_socket().ok_or(ZmqError::NoMessage)
+        pipe.read_from_session().ok_or(ZmqError::NoMessage)
     }
 
     fn xhas_in(&self) -> bool {
-        self.pipe.as_ref().map(|p| p.check_read_from_socket()).unwrap_or(false)
+        self.pipe.as_ref().map(|p| p.check_read_from_session()).unwrap_or(false)
     }
 
     fn xhas_out(&self) -> bool {

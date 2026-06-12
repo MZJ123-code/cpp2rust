@@ -19,6 +19,13 @@
 - 语义等价 + 全路径单元测试
 - unsafe < 10%，性能 ≥ C++ 95%
 
+## 当前状态
+- **全 workspace**: 209 passed, 0 failed, 205 ignored（2026-06-12）
+- **工作 socket**: PAIR/REQ/REP/PUSH/PULL — inproc 传输正常
+- **桩 socket (xrecv 返回 NoMessage)**: ROUTER、DEALER
+- **未实现 socket**: PUB/SUB/XPUB/XSUB/STREAM/SCATTER/GATHER 等草案 API
+- **关键限制**: 仅 inproc 传输可用，TCP/IPC/UDP 传输尚未集成 session
+
 ## 环境约束（重要！避免踩坑）
 
 ### Rust 工具链
@@ -117,6 +124,27 @@ zmq-ffi → zmq-context → zmq-transport + zmq-runtime → zmq-core
 | `socket_base_t` | `zmq_context::ZSocket` | Phase 6 |
 | 各 socket 类型 | `zmq_core::socket::*` (19 种) | Phase 5 |
 
+## Pipe 架构（重要！理解和修改前必读）
+
+`Pipe::new_pair()` 创建两个独立 Pipe，共享 `Arc<Mutex<YPipe>>` 底层队列：
+
+```
+A.to_session = a_to_b (A 发 → B 收)
+A.to_socket = b_to_a (B 发 → A 收)  
+B.to_session = b_to_a (B 发 → A 收)
+B.to_socket = a_to_b (A 发 → B 收)
+```
+
+- `write_to_session()` → 写 `to_session` 队列（本地发往对端）
+- `read_from_session()` → 读 `to_socket` 队列（对端发往本地）
+- 所有 socket 的 xrecv 使用 `read_from_session()`（读 to_socket）
+- 所有 socket 的 xsend 使用 `write_to_session()`（写 to_session）
+
+**重要踩坑记录**：
+1. **Pipe ID 必须全局唯一** — `Pipe::new_pair()` 使用 `AtomicUsize` 全局计数器。所有 pipe pair 使用相同 ID(0/1) 会导致 HashMap 只保留最后一个 pipe。
+2. **REQ option 需传播到 inner socket** — `set_req_relaxed()` / `set_req_correlate()` 不能只存 ZSocket 的 options，必须通过 Socket trait 方法写入 inner socket。
+3. **DEALER/ROUTER xrecv 为桩** — 目前返回 NoMessage，需要实现完整接收逻辑。
+
 ## 常用命令
 
 ```bash
@@ -130,6 +158,9 @@ cargo test
 
 # 运行特定 crate 的测试
 cargo test -p zmq-core
+
+# 运行单个测试
+cargo test --test test_spec_req
 
 # miri 检测未定义行为（需要 nightly）
 cargo +nightly miri test -p zmq-core

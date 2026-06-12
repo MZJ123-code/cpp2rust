@@ -122,14 +122,14 @@ fn destroy_queue_on_disconnect(ctx: &TestContext) {
 }
 
 #[test]
-#[ignore = "DEALER socket not yet implemented"]
+#[ignore = "DEALER socket xrecv not yet implemented"]
 fn test_round_robin_out_inproc() {
     let ctx = TestContext::new();
     round_robin_out(&ctx);
 }
 
 #[test]
-#[ignore = "DEALER socket not yet implemented"]
+#[ignore = "DEALER socket xrecv not yet implemented"]
 fn test_fair_queue_in_inproc() {
     let ctx = TestContext::new();
     fair_queue_in(&ctx);

@@ -438,7 +438,7 @@ impl Socket for XpubSocket {
         let pipe_id = pipe.id();
 
         // Read all pending subscription messages from the pipe.
-        while let Some(msg) = pipe.read_from_socket() {
+        while let Some(msg) = pipe.read_from_session() {
             let data = msg.data();
             let first_part = !self.more_recv;
             self.more_recv = msg.more();
@@ -520,10 +520,11 @@ mod tests {
     fn test_xpub_attach_pipe_subscribe_to_all() {
         let mut sock = XpubSocket::new();
         let pipe = make_pipe(200);
+        let pipe_id = pipe.id();
         sock.attach_pipe(pipe, true, true);
         // subscribe_to_all adds empty prefix → all messages match
         let matching = sock.match_topic(b"anything");
-        assert!(matching.contains(&200));
+        assert!(matching.contains(&pipe_id));
     }
 
     #[test]
